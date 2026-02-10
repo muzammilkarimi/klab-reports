@@ -1,73 +1,68 @@
-# React + TypeScript + Vite
+# KLab Reports 🔬
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+KLab Reports is a state-of-the-art Medical Laboratory Management System designed for precision, speed, and aesthetic excellence. Built as a cross-platform desktop application using Electron and React, it provides a premium experience for managing patients, generating professional medical reports, and tracking laboratory workflows.
 
-Currently, two official plugins are available:
+## ✨ Key Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Premium High-Contrast UI**: A modern, glassmorphic interface designed with Indigo accents and high-legibility Slate typography.
+- **Smart Report Entry**: Real-time validation with automated "Abnormal" range detection (High/Low) to prevent diagnostic errors.
+- **Professional PDF Generation**: Instantly generate beautiful, column-wise PDF reports with custom laboratory branding and sharp formatting.
+- **Patient Management**: Searchable patient database with autocomplete and history tracking.
+- **Integrated Dashboard**: Real-time stats, weekly trends, and usage limits for simplified management.
+- **Lite & Pro Tiers**: Built-in support for monthly usage limits and feature-locked Pro functionality.
+- **Offline First**: Fast, local SQLite database ensuring reliability even without an internet connection.
 
-## React Compiler
+## 🛠️ Technology Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend**: React 18, Vite, Material UI (MUI)
+- **Desktop Framework**: Electron
+- **Database**: SQLite (via `better-sqlite3`)
+- **Styling**: Vanilla CSS & MUI SX System (Premium Theme)
+- **Icons**: Material Design Icons
+- **PDF Engine**: Playwright/Electron Print-to-PDF
 
-## Expanding the ESLint configuration
+## 🚀 Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- [Node.js](https://nodejs.org/) (v16 or higher)
+- npm or yarn
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/muzammilkarimi/klab-reports.git
+   cd klab-reports
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+### Running the App
+
+To start the app in development mode:
+```bash
+npm run electron:dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+To build the production app:
+```bash
+npm run dist
 ```
+
+## 📂 Project Structure
+
+- `src/`: React frontend source code.
+- `electron/`: Main process and Electron configuration.
+- `backend/`: API services and database controllers.
+- `database/`: SQLite database files and initialization scripts.
+
+## 🛡️ License
+
+Private - Developed for KLab Reports.
+
+---
+*Created with ❤️ by the KLab Reports Team*
