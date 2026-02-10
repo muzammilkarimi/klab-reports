@@ -1,7 +1,7 @@
 {
   "name": "klab-reports",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -21,12 +21,16 @@
     "directories": {
       "output": "release"
     },
+    "asar": true,
+    "asarUnpack": [
+      "backend",
+      "database"
+    ],
     "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "backend/**/*",
-      "package.json",
-      "node_modules/**/*"
+      "dist",
+      "electron",
+      "backend",
+      "package.json"
     ],
     "win": {
       "target": "nsis"

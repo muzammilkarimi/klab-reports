@@ -6,7 +6,25 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.join(__dirname, '../database/klab.db');
+// Get the user's data directory. In Electron, this is app.getPath('userData')
+// Since this is the backend (running in Node), we check env or use a safe default
+const isPackaged = process.env.NODE_ENV === 'production' || !!process.env.ELECTRON_RUN_AS_NODE;
+const userDataPath = process.env.USER_DATA_PATH || 
+    (process.platform === 'win32' ? process.env.APPDATA : path.join(process.env.HOME, '.config'));
+
+const baseDir = isPackaged 
+    ? path.join(userDataPath, 'kLab-Reports') 
+    : path.join(__dirname, '..');
+
+const dbPath = path.join(baseDir, 'database', 'klab.db');
+
+// Ensure directory exists
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+}
+
+console.log('Using Database at:', dbPath);
 const db = new Database(dbPath, { verbose: console.log });
 
 function initDb() {

@@ -117,13 +117,23 @@ ipcMain.handle('print-to-pdf', async (event, reportId, suggestedName) => {
 
 app.whenReady().then(() => {
   // Start Backend
-  const backendPath = path.join(__dirname, '../backend/server.js');
-  const BACKEND_PORT = 5000; // Define BACKEND_PORT here as it's used by the backend
+  const isDev = !app.isPackaged;
+  const backendPath = isDev 
+    ? path.join(__dirname, '../backend/server.js')
+    : path.join(process.resourcesPath, 'app.asar.unpacked/backend/server.js');
+    
+  const BACKEND_PORT = 5000;
   backendProcess = fork(backendPath, [], {
-    env: { ...process.env, PORT: BACKEND_PORT }
+    env: { 
+      ...process.env, 
+      PORT: BACKEND_PORT,
+      NODE_ENV: isDev ? 'development' : 'production',
+      USER_DATA_PATH: app.getPath('userData')
+    }
   });
 
-  console.log('Backend started with PID:', backendProcess.pid);
+  console.log('Backend started with path:', backendPath);
+  console.log('Backend PID:', backendProcess.pid);
 
   createWindow();
 
