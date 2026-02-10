@@ -12,7 +12,8 @@
     "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"npm run electron\"",
     "electron": "wait-on tcp:5173 && electron .",
     "electron:build": "vite build && electron-builder",
-    "rebuild": "electron-builder install-app-deps"
+    "rebuild": "electron-builder install-app-deps",
+    "dist": "npm run build && electron-builder --win nsis -c.extraMetadata.main=electron/main.js -c.cscLink=null"
   },
   "build": {
     "appId": "com.klab.reports",

@@ -12,7 +12,6 @@ import Drafts from './pages/Drafts';
 import Settings from './pages/Settings';
 import LoginPage from './pages/LoginPage';
 import UpgradePage from './pages/UpgradePage';
-import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -27,11 +26,7 @@ function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 
-                <Route path="/" element={
-                  <ProtectedRoute>
-                    <MainLayout />
-                  </ProtectedRoute>
-                }>
+                <Route path="/" element={<MainLayout />}>
                   <Route index element={<Dashboard />} />
                   <Route path="new-report" element={<ReportEntry />} />
                   <Route path="tests" element={<TestMaster />} />
@@ -41,11 +36,7 @@ function App() {
                   <Route path="upgrade" element={<UpgradePage />} />
                 </Route>
 
-                <Route path="/view-report/:id" element={
-                  <ProtectedRoute>
-                    <ViewReport />
-                  </ProtectedRoute>
-                } />
+                <Route path="/view-report/:id" element={<ViewReport />} />
                 
                 <Route path="/print-report/:id" element={<PrintReport />} />
               </Routes>

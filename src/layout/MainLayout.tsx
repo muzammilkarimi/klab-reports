@@ -195,9 +195,15 @@ const MainLayout = () => {
                         <MenuIcon />
                     </IconButton>
                     <Box sx={{ flexGrow: 1 }} />
-                    <IconButton color="primary" onClick={handleLogout}>
-                        <LogoutIcon />
-                    </IconButton>
+                    {user ? (
+                        <IconButton color="primary" onClick={handleLogout} title="Logout">
+                            <LogoutIcon />
+                        </IconButton>
+                    ) : (
+                        <IconButton color="primary" onClick={() => navigate('/login')} title="Login">
+                            <LockIcon />
+                        </IconButton>
+                    )}
                 </Toolbar>
             </AppBar>
 
