@@ -9,12 +9,20 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const logFile = path.join(__dirname, 'backend.log');
+
+// Ensure we have a writable log path
+const isPackaged = process.env.NODE_ENV === 'production' || !!process.env.ELECTRON_RUN_AS_NODE;
+const userDataPath = process.env.USER_DATA_PATH || 
+    (process.platform === 'win32' ? process.env.APPDATA : path.join(process.env.HOME, '.config'));
+const appDataDir = path.join(userDataPath, 'kLab-Reports');
+if (!fs.existsSync(appDataDir)) fs.mkdirSync(appDataDir, { recursive: true });
+
+const logFile = path.join(appDataDir, 'backend.log');
 
 try {
     const startMsg = `Backend starting at ${new Date().toISOString()}\n`;
-    fs.writeFileSync(logFile, startMsg);
-    fs.appendFileSync(logFile, `Node: ${process.version}, Electron: ${process.versions.electron}\n`);
+    fs.appendFileSync(logFile, startMsg);
+    fs.appendFileSync(logFile, `Node: ${process.version}, Platform: ${process.platform}, Env: ${process.env.NODE_ENV}\n`);
     
     // Redirect console logs to file
     const originalLog = console.log;
@@ -28,7 +36,7 @@ try {
         try { fs.appendFileSync(logFile, `[ERR] ${args.join(' ')}\n`); } catch {}
     };
 } catch (e) {
-    console.error('Failed to write log', e);
+    // If logging fails, we can't do much, but at least don't crash the server
 }
 
 const app = express();

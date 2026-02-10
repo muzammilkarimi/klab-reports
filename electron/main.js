@@ -118,18 +118,47 @@ ipcMain.handle('print-to-pdf', async (event, reportId, suggestedName) => {
 app.whenReady().then(() => {
   // Start Backend
   const isDev = !app.isPackaged;
+  const userDataPath = app.getPath('userData');
+  const appDataDir = path.join(userDataPath, 'kLab-Reports');
+  
+  // Ensure the AppData directory exists before starting backend
+  if (!fs.existsSync(appDataDir)) {
+    fs.mkdirSync(appDataDir, { recursive: true });
+  }
+
   const backendPath = isDev 
     ? path.join(__dirname, '../backend/server.js')
     : path.join(process.resourcesPath, 'app.asar.unpacked/backend/server.js');
     
+  if (!fs.existsSync(backendPath)) {
+    console.error('CRITICAL: Backend file not found at:', backendPath);
+    // In production, we might want to show a dialog
+    if (!isDev) {
+      dialog.showErrorBox('Backend Error', `Backend server not found at: ${backendPath}`);
+    }
+  }
+
   const BACKEND_PORT = 5000;
   backendProcess = fork(backendPath, [], {
     env: { 
       ...process.env, 
       PORT: BACKEND_PORT,
       NODE_ENV: isDev ? 'development' : 'production',
-      USER_DATA_PATH: app.getPath('userData')
-    }
+      USER_DATA_PATH: userDataPath
+    },
+    stdio: 'pipe' // Capture stdout/stderr
+  });
+
+  backendProcess.stdout.on('data', (data) => {
+    console.log(`Backend Log: ${data}`);
+  });
+
+  backendProcess.stderr.on('data', (data) => {
+    console.error(`Backend Error: ${data}`);
+    // Log fatal backend errors to a file in userData
+    try {
+      fs.appendFileSync(path.join(appDataDir, 'fatal_error.log'), `[${new Date().toISOString()}] ${data}\n`);
+    } catch {}
   });
 
   console.log('Backend started with path:', backendPath);
