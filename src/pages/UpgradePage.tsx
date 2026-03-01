@@ -27,8 +27,8 @@ const UpgradePage = () => {
                 setSuccess('Pro Version Activated Successfully!');
                 await refreshLicense();
             }
-        } catch (err: any) {
-            setError(err.message || 'Activation failed');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Activation failed');
         } finally {
             setLoading(false);
         }

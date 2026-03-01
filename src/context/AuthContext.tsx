@@ -9,7 +9,7 @@ interface User {
 
 interface AuthContextType {
     user: User | null;
-    login: (userData: any) => void;
+    login: (userData: User) => void;
     logout: () => void;
     isAuthenticated: boolean;
     tier: 'FREE' | 'PRO';
@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (savedUser) {
                     try {
                         setUser(JSON.parse(savedUser));
-                    } catch (e) {
+                    } catch {
                         localStorage.removeItem('klab_user');
                     }
                 }
@@ -89,6 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) {

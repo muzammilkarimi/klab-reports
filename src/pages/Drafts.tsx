@@ -2,44 +2,25 @@ import { useState, useEffect } from 'react';
 import { 
     Box, Typography, Table, TableBody, TableCell, 
     TableContainer, TableHead, TableRow, Chip,
-    TextField, InputAdornment, IconButton, Tooltip, Button
+    TextField, InputAdornment, IconButton, Tooltip
 } from '@mui/material';
-import LockIcon from '@mui/icons-material/Lock';
 import SearchIcon from '@mui/icons-material/Search';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DescriptionIcon from '@mui/icons-material/Description';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/api';
-import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 
-interface Report {
-    id: number;
-    patient_name: string;
-    patient_age: number;
-    patient_gender: string;
-    test_names: string;
-    total_amount: number;
-    status: 'DRAFT' | 'FINAL';
-    created_at: string;
-}
+import type { Report } from '../types';
 
 const Drafts = () => {
     const navigate = useNavigate();
-    const { isPro } = useAuth();
     const { showToast, showConfirm } = useNotification();
 
-    useEffect(() => {
-        // No redirect - we show a teaser instead
-    }, [isPro, navigate]);
     const [reports, setReports] = useState<Report[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        loadReports();
-    }, []);
 
     const loadReports = async () => {
         try {
@@ -56,6 +37,15 @@ const Drafts = () => {
             setLoading(false); 
         }
     };
+
+    useEffect(() => {
+        let ignore = false;
+        const fetchReports = async () => {
+             await loadReports();
+        };
+        if (!ignore) fetchReports();
+        return () => { ignore = true; };
+    }, []);
 
     const handleResume = (reportId: number) => {
         // Navigate to edit - for now navigate to new report (can be enhanced to load draft data)
@@ -86,37 +76,6 @@ const Drafts = () => {
 
     return (
         <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, md: 0 }, pb: 10, position: 'relative' }}>
-            {!isPro && (
-                <Box sx={{ 
-                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
-                    zIndex: 2000, bgcolor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(12px)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    borderRadius: 8, p: 4, textAlign: 'center', minHeight: 400
-                }}>
-                    <Box sx={{ 
-                        width: 80, height: 80, borderRadius: '24px', 
-                        background: 'var(--primary-gradient)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'white', mb: 3, boxShadow: '0 10px 30px rgba(99, 102, 241, 0.4)'
-                    }}>
-                        <LockIcon sx={{ fontSize: 40 }} />
-                    </Box>
-                    <Typography variant="h3" fontWeight="900" sx={{ mb: 2 }}>Drafts are a Pro feature</Typography>
-                    <Typography variant="h6" color="text.secondary" sx={{ mb: 4, maxWidth: 500, fontWeight: 500 }}>
-                        Save reports as drafts and finish them later with kLab Pro.
-                    </Typography>
-                    <Button 
-                        variant="contained" 
-                        size="large"
-                        className="premium-button"
-                        onClick={() => navigate('/upgrade')}
-                        sx={{ borderRadius: 4, px: 6, py: 2, fontWeight: 800, fontSize: '1.1rem' }}
-                    >
-                        Upgrade to Pro
-                    </Button>
-                </Box>
-            )}
-
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'flex-end' }, mb: 6, mt: 4, gap: 3 }}>
                 <Box>
                     <Typography variant="h3" fontWeight="800" className="gradient-text" sx={{ mb: 1, letterSpacing: -1 }}>

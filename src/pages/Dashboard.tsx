@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Box, Typography, Stack, Button, Chip, IconButton } from '@mui/material';
-import LockIcon from '@mui/icons-material/Lock';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import PrintIcon from '@mui/icons-material/Print';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
@@ -9,12 +8,11 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/api';
-import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
+import type { Report } from '../types';
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const { isPro } = useAuth();
     const { showToast } = useNotification();
 
     const [stats, setStats] = useState({
@@ -23,8 +21,8 @@ const Dashboard = () => {
         drafts: 0,
         mostUsed: 'N/A'
     });
-    const [recent, setRecent] = useState<any[]>([]);
-    const [chartData, setChartData] = useState<any[]>([]);
+    const [recent, setRecent] = useState<Report[]>([]);
+    const [chartData, setChartData] = useState<{name: string, count: number}[]>([]);
     const [labName, setLabName] = useState('My Laboratory');
     const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -34,14 +32,15 @@ const Dashboard = () => {
     }, []);
 
     useEffect(() => {
+        let ignore = false;
         const loadDashboardData = async () => {
             try {
                 // Load Lab Name
                 const settings = await api.getSettings();
-                if (settings.lab_name) setLabName(settings.lab_name);
+                if (!ignore && settings.lab_name) setLabName(settings.lab_name);
 
                 const reports = await api.getReports(); 
-                if (Array.isArray(reports)) {
+                if (!ignore && Array.isArray(reports)) {
                     setRecent(reports.slice(0, 5));
                     const now = new Date();
                     const todayStr = now.toDateString();
@@ -52,7 +51,7 @@ const Dashboard = () => {
                     let draftsCount = 0;
                     const testCounts: Record<string, number> = {};
 
-                    reports.forEach((r: any) => {
+                    reports.forEach((r: Report) => {
                         const rDate = new Date(r.created_at);
                         if (rDate.toDateString() === todayStr) todayCount++;
                         if (rDate.getMonth() === currentMonth && rDate.getFullYear() === now.getFullYear()) monthCount++;
@@ -78,7 +77,7 @@ const Dashboard = () => {
 
                     const sortedChartData = Object.entries(testCounts)
                         .map(([name, count]) => ({ name, count }))
-                        .sort((a, b) => (b.count as number) - (a.count as number))
+                        .sort((a, b) => b.count - a.count)
                         .slice(0, 6);
                     setChartData(sortedChartData);
                 }
@@ -87,6 +86,7 @@ const Dashboard = () => {
             }
         };
         loadDashboardData();
+        return () => { ignore = true; };
     }, []);
 
     const statCards = [
@@ -172,29 +172,6 @@ const Dashboard = () => {
                             <Typography variant="h6" fontWeight="800">Testing Trends</Typography>
                             <Typography variant="body2" color="text.secondary" fontWeight="500">Number of times each test was performed.</Typography>
                         </Box>
-                        
-                        {!isPro && (
-                            <Box sx={{ 
-                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
-                                zIndex: 10, bgcolor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)',
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                p: 4, textAlign: 'center'
-                            }}>
-                                <LockIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2, opacity: 0.8 }} />
-                                <Typography variant="h5" fontWeight="900" sx={{ mb: 1 }}>Pro Version Required</Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 4, maxWidth: 300 }}>
-                                    Get the Pro version to see detailed charts and real-time activity.
-                                </Typography>
-                                <Button 
-                                    variant="contained" 
-                                    className="premium-button"
-                                    onClick={() => navigate('/upgrade')}
-                                    sx={{ borderRadius: 3, px: 4, fontWeight: 800 }}
-                                >
-                                    Upgrade to Pro
-                                </Button>
-                            </Box>
-                        )}
 
                         <Box sx={{ height: 320, width: '100%' }}>
                             {chartData.length === 0 ? (
@@ -237,19 +214,6 @@ const Dashboard = () => {
                             </Box>
                             <Button variant="text" size="small" sx={{ fontWeight: 800 }} onClick={() => navigate('/history')}>View All</Button>
                         </Box>
-
-                        {!isPro && (
-                            <Box sx={{ 
-                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
-                                zIndex: 10, bgcolor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)',
-                                borderRadius: '30px',
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                p: 4, textAlign: 'center'
-                            }}>
-                                <Typography variant="body2" fontWeight="800" color="text.secondary">PRIVATE ACTIVITY FEED</Typography>
-                                <Typography variant="caption" color="text.disabled" sx={{ mt: 1 }}>Upgrade to Pro to see recent reports here</Typography>
-                            </Box>
-                        )}
                         <Stack spacing={2}>
                             {recent.length === 0 ? (
                                 <Box sx={{ py: 6, textAlign: 'center', opacity: 0.3 }}>

@@ -1,7 +1,7 @@
 import { 
     Box, TextField, Typography, MenuItem, Chip, Button, 
     InputAdornment, ToggleButtonGroup, ToggleButton,
-    Autocomplete, CircularProgress, Tooltip
+    Autocomplete, CircularProgress
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -10,25 +10,18 @@ import ScienceIcon from '@mui/icons-material/Science';
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/api';
-import type { TestParameter } from '../types';
-import { useAuth } from '../context/AuthContext';
+import type { TestParameter, Patient, Test as GlobalTest } from '../types';
 import { useNotification } from '../context/NotificationContext';
-import WarningIcon from '@mui/icons-material/Warning';
-import { Alert, AlertTitle } from '@mui/material';
+import { useCallback } from 'react';
 
-interface Test {
-    id: number;
-    test_name: string;
-    price: number;
-}
+type Test = GlobalTest;
 
 const ReportEntry = () => {
     const navigate = useNavigate();
-    const { isPro, monthlyUsage, usageLimit, refreshLicense } = useAuth();
     const { showToast, showConfirm } = useNotification();
     // State
     const [tests, setTests] = useState<Test[]>([]);
-    const [patients, setPatients] = useState<any[]>([]);
+    const [patients, setPatients] = useState<Patient[]>([]);
     const [loadingPatients, setLoadingPatients] = useState(false);
     const [selectedTestIds, setSelectedTestIds] = useState<number[]>([]);
     const [patient, setPatient] = useState({ name: '', age: '', gender: '', phone: '' });
@@ -36,6 +29,8 @@ const ReportEntry = () => {
     
     // New PRD fields
     const [referringDoctor, setReferringDoctor] = useState('');
+    const [referringDoctors, setReferringDoctors] = useState<string[]>([]);
+    const [loadingDoctors, setLoadingDoctors] = useState(false);
     const [sampleCollectionDate, setSampleCollectionDate] = useState(
         new Date().toLocaleDateString('sv').split(' ')[0] // Today's date in local YYYY-MM-DD format
     );
@@ -46,39 +41,41 @@ const ReportEntry = () => {
     const [results, setResults] = useState<Record<number, string>>({});
     const [saving, setSaving] = useState(false);
 
+    // Load draft data if draft ID is present in URL
+    const [searchParams] = useSearchParams();
+    const draftId = searchParams.get('draft');
+
     // Load tests and patients on mount
     useEffect(() => {
+        let ignore = false;
         api.getTests()
-            .then(data => setTests(data))
+            .then(data => { if (!ignore) setTests(data); })
             .catch(err => console.error('Error fetching tests:', err));
 
         setLoadingPatients(true);
         api.getPatients()
-            .then(data => setPatients(data))
+            .then(data => { if (!ignore) setPatients(data); })
             .catch(err => console.error('Error fetching patients:', err))
-            .finally(() => setLoadingPatients(false));
+            .finally(() => { if (!ignore) setLoadingPatients(false); });
+
+        setLoadingDoctors(true);
+        api.getReferringDoctors()
+            .then(data => { if (!ignore) setReferringDoctors(data); })
+            .catch(err => console.error('Error fetching doctors:', err))
+            .finally(() => { if (!ignore) setLoadingDoctors(false); });
             
         // Suggest next bill number if not in draft mode
         if (!draftId) {
             api.getNextBillNumber()
                 .then(data => {
-                    if (data.nextBillNumber) setBillNumber(data.nextBillNumber);
+                    if (!ignore && data.nextBillNumber) setBillNumber(data.nextBillNumber);
                 })
                 .catch(err => console.error('Error fetching next bill number:', err));
         }
-    }, []);
-
-    // Load draft data if draft ID is present in URL
-    const [searchParams] = useSearchParams();
-    const draftId = searchParams.get('draft');
-
-    useEffect(() => {
-        if (draftId) {
-            loadDraftData(Number(draftId));
-        }
+        return () => { ignore = true; };
     }, [draftId]);
 
-    const loadDraftData = async (id: number) => {
+    const loadDraftData = useCallback(async (id: number) => {
         try {
             const report = await api.getReport(id);
             // Pre-fill patient info
@@ -95,14 +92,13 @@ const ReportEntry = () => {
             setSampleCollectionDate(report.sample_collection_date ? report.sample_collection_date.split('T')[0] : new Date().toLocaleDateString('sv'));
             setBillNumber(report.bill_number || '');
             
-            // Pre-fill test selection and results if available
             if (report.results && report.results.length > 0) {
                 // Use test_id which we now return from the backend
-                const testIds = [...new Set(report.results.map((r: any) => r.test_id))].filter(Boolean);
-                setSelectedTestIds(testIds as number[]);
+                const resultsTestIds = [...new Set(report.results.map((r) => r.test_id))].filter(Boolean);
+                setSelectedTestIds(resultsTestIds as number[]);
                 
                 const resultsMap: Record<number, string> = {};
-                report.results.forEach((r: any) => {
+                report.results.forEach((r) => {
                     if (r.parameter_id && r.result_value) {
                         resultsMap[r.parameter_id] = r.result_value;
                     }
@@ -113,7 +109,13 @@ const ReportEntry = () => {
             console.error('Failed to load draft:', error);
             showToast('Failed to load draft data', 'error');
         }
-    };
+    }, [showToast]);
+
+    useEffect(() => {
+        if (draftId) {
+            loadDraftData(Number(draftId));
+        }
+    }, [draftId, loadDraftData]);
 
     const [loadingParams, setLoadingParams] = useState(false);
 
@@ -169,8 +171,6 @@ const ReportEntry = () => {
         return 'NORMAL';
     };
 
-    const limitReached = !isPro && monthlyUsage >= usageLimit;
-
     const isFormValidForFinal = () => {
         // 1. Patient Info Check
         const patientFieldsOk = patient.name && patient.age && patient.gender && referringDoctor && billNumber;
@@ -179,19 +179,20 @@ const ReportEntry = () => {
         // 2. Tests Check
         if (selectedTestIds.length === 0) return { valid: false, reason: 'Please select at least one test.' };
 
-        // 3. Results Check
-        const allResultsFilled = parameters.length > 0 && parameters.every(p => results[p.id] && String(results[p.id]).trim() !== '');
+        // 3. Results Check (only for parameters applicable to patient's gender)
+        const applicableParams = parameters.filter((p) => {
+            if (p.gender_specific === 1 && patient.gender.toLowerCase() !== 'male') return false;
+            if (p.gender_specific === 2 && patient.gender.toLowerCase() !== 'female') return false;
+            return true;
+        });
+
+        const allResultsFilled = applicableParams.length > 0 && applicableParams.every(p => results[p.id] && String(results[p.id]).trim() !== '');
         if (!allResultsFilled) return { valid: false, reason: 'Please fill all test result fields.' };
 
         return { valid: true };
     };
 
     const handleSave = async (status: 'DRAFT' | 'FINAL') => {
-        if (status === 'FINAL' && limitReached) {
-            showToast('Monthly report limit reached for Free Tier. Please upgrade to Pro.', 'warning');
-            return;
-        }
-        
         const validation = status === 'FINAL' ? isFormValidForFinal() : { valid: !!patient.name, reason: 'Please enter at least the patient name.' };
         
         if (!validation.valid) {
@@ -225,7 +226,7 @@ const ReportEntry = () => {
             });
 
             const reportData = {
-                patient_id: patientId,
+                patient_id: patientId || undefined,
                 test_ids: selectedTestIds,
                 total_amount: tests.filter(t => selectedTestIds.includes(t.id)).reduce((sum, t) => sum + t.price, 0),
                 status: status,
@@ -246,7 +247,11 @@ const ReportEntry = () => {
 
             if (reportRes.success) {
                 showToast(`Report ${draftId ? 'updated' : 'saved'} as ${status}!`);
-                await refreshLicense(); // Update usage count
+
+                // Update local referring doctors list if it's a new doctor
+                if (referringDoctor && !referringDoctors.includes(referringDoctor)) {
+                    setReferringDoctors(prev => [...prev, referringDoctor].sort());
+                }
 
                 if (status === 'FINAL') {
                     // 1. Reset and navigate on final
@@ -269,25 +274,27 @@ const ReportEntry = () => {
                     );
                 }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Save failed:', error);
-            if (error?.status === 403) {
-                showToast(error.message || 'Monthly limit reached. Please upgrade to Pro.', 'error');
-            } else {
-                showToast('Failed to save report: ' + (error instanceof Error ? error.message : String(error)), 'error');
-            }
+            showToast('Failed to save report: ' + (error instanceof Error ? error.message : String(error)), 'error');
         } finally {
             setSaving(false);
         }
     };
 
-    // Group parameters by Test ID for the Accordion UI
+    // Group parameters by Test ID for the Accordion UI, filtering by patient gender
     const paramsByTest = selectedTestIds.reduce((acc, testId) => {
         const test = tests.find(t => t.id === testId);
         if (test) {
             acc[test.id] = {
                 testName: test.test_name,
-                params: parameters.filter(p => p.test_id === test.id)
+                params: parameters.filter(p => {
+                    if (p.test_id !== test.id) return false;
+                    // Filter by gender if specified
+                    if (p.gender_specific === 1 && patient.gender.toLowerCase() !== 'male') return false;
+                    if (p.gender_specific === 2 && patient.gender.toLowerCase() !== 'female') return false;
+                    return true;
+                })
             };
         }
         return acc;
@@ -309,14 +316,6 @@ const ReportEntry = () => {
                     <CircularProgress size={20} thickness={6} sx={{ color: '#6366f1' }} />
                     <Typography sx={{ ml: 2, fontWeight: 600, color: '#4f46e5' }}>Loading test details...</Typography>
                 </Box>
-            )}
-
-            {limitReached && (
-                <Alert severity="warning" icon={<WarningIcon />} sx={{ mb: 4, borderRadius: 6, border: '1px solid rgba(255, 171, 0, 0.2)', bgcolor: 'rgba(255, 171, 0, 0.05)' }}>
-                    <AlertTitle sx={{ fontWeight: '800' }}>Monthly Limit Warning</AlertTitle>
-                    You have reached the monthly limit of {usageLimit} reports. 
-                    Upgrade to <strong>PRO</strong> for unlimited reports.
-                </Alert>
             )}
 
             {/* Section A: Patient Info */}
@@ -348,7 +347,7 @@ const ReportEntry = () => {
                                 setPatient({ ...patient, name: newValue });
                                 if (!newValue) setExistingPatientId(null);
                             }}
-                            onChange={(_, newValue: any) => {
+                            onChange={(_, newValue) => {
                                 if (newValue && typeof newValue !== 'string') {
                                     setPatient({
                                         name: newValue.name,
@@ -356,7 +355,7 @@ const ReportEntry = () => {
                                         gender: newValue.gender || '',
                                         phone: newValue.phone || ''
                                     });
-                                    setExistingPatientId(newValue.id);
+                                    setExistingPatientId(newValue.id || null);
                                 }
                             }}
                             renderInput={(params) => (
@@ -440,15 +439,33 @@ const ReportEntry = () => {
                 {/* Second row: Registry Details */}
                 <Box sx={{ mt: 4, pt: 4, borderTop: '1px dashed #e2e8f0' }}>
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 4 }}>
-                        <TextField 
-                            fullWidth 
-                            label="Referring Clinician" 
-                            variant="outlined" 
-                            value={referringDoctor} 
-                            onChange={(e) => setReferringDoctor(e.target.value)}
-                            placeholder="Dr. Smith"
-                            sx={{ '& .MuiInputLabel-root': { color: '#64748b', fontWeight: 600 } }}
-                            InputProps={{ sx: { borderRadius: 3, bgcolor: '#f8fafc', color: '#1e293b', fontWeight: 700, '& .MuiOutlinedInput-notchedOutline': { borderColor: '#cbd5e1', borderWidth: '1.5px' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#6366f1' } } }}
+                        <Autocomplete
+                            freeSolo
+                            options={referringDoctors}
+                            loading={loadingDoctors}
+                            value={referringDoctor}
+                            onInputChange={(_, newValue) => setReferringDoctor(newValue)}
+                            onChange={(_, newValue) => setReferringDoctor(newValue || '')}
+                            renderInput={(params) => (
+                                <TextField 
+                                    {...params}
+                                    fullWidth 
+                                    label="Referring Clinician" 
+                                    variant="outlined" 
+                                    placeholder="Dr. Smith"
+                                    sx={{ '& .MuiInputLabel-root': { color: '#64748b', fontWeight: 600 } }}
+                                    InputProps={{ 
+                                        ...params.InputProps,
+                                        sx: { borderRadius: 3, bgcolor: '#f8fafc', color: '#1e293b', fontWeight: 700, '& .MuiOutlinedInput-notchedOutline': { borderColor: '#cbd5e1', borderWidth: '1.5px' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#6366f1' } },
+                                        endAdornment: (
+                                            <>
+                                                {loadingDoctors ? <CircularProgress color="inherit" size={20} /> : null}
+                                                {params.InputProps.endAdornment}
+                                            </>
+                                        ),
+                                    }}
+                                />
+                            )}
                         />
 
                         <TextField 
@@ -681,40 +698,32 @@ const ReportEntry = () => {
                     </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Tooltip title={!isPro ? "Draft management is a Pro feature" : ""}>
-                        <span>
-                            <Button 
-                                variant="outlined" 
-                                startIcon={<SaveIcon />}
-                                onClick={() => handleSave('DRAFT')}
-                                disabled={saving || !isPro}
-                                sx={{ px: 4, borderRadius: 4, fontWeight: 700, border: '2px solid' }}
-                            >
-                                Save as Draft
-                            </Button>
-                        </span>
-                    </Tooltip>
+                    <Button 
+                        variant="outlined" 
+                        startIcon={<SaveIcon />}
+                        onClick={() => handleSave('DRAFT')}
+                        disabled={saving}
+                        sx={{ px: 4, borderRadius: 4, fontWeight: 700, border: '2px solid' }}
+                    >
+                        Save as Draft
+                    </Button>
                     
-                    <Tooltip title={limitReached ? "Monthly limit reached (30/30). Upgrade to Pro for unlimited access." : ""}>
-                        <span>
-                            <Button 
-                                variant="contained" 
-                                startIcon={<DescriptionIcon />}
-                                onClick={() => handleSave('FINAL')}
-                                    className={!isFormValidForFinal().valid ? "" : "premium-button"}
-                                    color={!isFormValidForFinal().valid ? "inherit" : "primary"}
-                                    sx={{ 
-                                        px: 5, py: 1.5, fontWeight: 800,
-                                        borderRadius: 4,
-                                        textTransform: 'none',
-                                        boxShadow: !isFormValidForFinal().valid ? 'none' : undefined
-                                    }}
-                                    disabled={saving || limitReached || !isFormValidForFinal().valid}
-                                >
-                                {saving ? <CircularProgress size={24} color="inherit" /> : (limitReached ? 'Limit Reached' : 'Finish and Save Report')}
-                            </Button>
-                        </span>
-                    </Tooltip>
+                    <Button 
+                        variant="contained" 
+                        startIcon={<DescriptionIcon />}
+                        onClick={() => handleSave('FINAL')}
+                            className={!isFormValidForFinal().valid ? "" : "premium-button"}
+                            color={!isFormValidForFinal().valid ? "inherit" : "primary"}
+                            sx={{ 
+                                px: 5, py: 1.5, fontWeight: 800,
+                                borderRadius: 4,
+                                textTransform: 'none',
+                                boxShadow: !isFormValidForFinal().valid ? 'none' : undefined
+                            }}
+                            disabled={saving || !isFormValidForFinal().valid}
+                        >
+                        {saving ? <CircularProgress size={24} color="inherit" /> : 'Finish and Save Report'}
+                    </Button>
                 </Box>
             </Box>
         </Box>

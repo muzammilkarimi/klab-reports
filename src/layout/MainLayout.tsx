@@ -1,17 +1,14 @@
 import { useState } from 'react';
-import { Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, AppBar, Toolbar, Typography, IconButton, useTheme, Avatar, Chip, Button } from '@mui/material';
+import { Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, AppBar, Toolbar, Typography, IconButton, useTheme } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import DraftsIcon from '@mui/icons-material/Drafts';
 import SettingsIcon from '@mui/icons-material/Settings';
-import LogoutIcon from '@mui/icons-material/Logout';
 import BiotechIcon from '@mui/icons-material/Biotech';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import ScienceIcon from '@mui/icons-material/Science';
-import LockIcon from '@mui/icons-material/Lock';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 
 const drawerWidth = 260;
 
@@ -28,16 +25,10 @@ const MainLayout = () => {
     const theme = useTheme();
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, logout, isPro, monthlyUsage, usageLimit } = useAuth();
     const [mobileOpen, setMobileOpen] = useState(false);
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
-    };
-
-    const handleLogout = () => {
-        logout();
-        navigate('/login');
     };
 
     const drawer = (
@@ -68,7 +59,6 @@ const MainLayout = () => {
             <List sx={{ px: 2, flexGrow: 1 }}>
                 {menuItems.map((item) => {
                     const active = location.pathname === item.path;
-                    const isLocked = item.pro && !isPro;
                     return (
                         <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
                             <ListItemButton
@@ -98,7 +88,6 @@ const MainLayout = () => {
                                             <Typography variant="body2" fontWeight={active ? 800 : 700}>
                                                 {item.text}
                                             </Typography>
-                                            {isLocked && <LockIcon sx={{ fontSize: '0.85rem', color: '#94a3b8', opacity: 0.6 }} />}
                                         </Box>
                                     } 
                                 />
@@ -114,68 +103,6 @@ const MainLayout = () => {
                     );
                 })}
             </List>
-
-            {/* User Profile & Plan */}
-            <Box sx={{ p: 3, borderTop: `1px solid rgba(0,0,0,0.05)`, bgcolor: 'rgba(0,0,0,0.01)' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                    <Avatar 
-                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'admin'}`}
-                        sx={{ 
-                            width: 44, height: 44, borderRadius: 3,
-                            bgcolor: '#f1f5f9',
-                            border: '2px solid white',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-                        }}
-                    >
-                        {user?.full_name?.charAt(0) || 'U'}
-                    </Avatar>
-                    <Box sx={{ overflow: 'hidden' }}>
-                        <Typography variant="subtitle2" fontWeight="900" color="#1e293b" noWrap sx={{ lineHeight: 1.2 }}>
-                            {user?.full_name || 'Administrator'}
-                        </Typography>
-                        <Chip 
-                            label={isPro ? "PRO VERSION" : "FREE TIER"} 
-                            size="small" 
-                            sx={{ 
-                                height: 16, fontSize: '0.55rem', fontWeight: 900, mt: 0.5,
-                                background: isPro ? 'linear-gradient(90deg, #6366f1, #a855f7)' : '#e2e8f0',
-                                color: isPro ? 'white' : '#64748b',
-                                border: 'none'
-                            }} 
-                        />
-                    </Box>
-                </Box>
-
-                {!isPro && (
-                    <Box sx={{ mt: 2 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                            <Typography variant="caption" fontWeight="800" color="text.secondary">REPORT LIMIT</Typography>
-                            <Typography variant="caption" fontWeight="900" color="primary">{monthlyUsage}/{usageLimit}</Typography>
-                        </Box>
-                        <Box sx={{ width: '100%', bgcolor: '#f1f5f9', height: 6, borderRadius: 3, mb: 2.5, overflow: 'hidden' }}>
-                            <Box 
-                                sx={{ 
-                                    width: `${Math.min((monthlyUsage / usageLimit) * 100, 100)}%`, 
-                                    background: 'linear-gradient(90deg, #6366f1, #10b981)', 
-                                    height: '100%',
-                                    borderRadius: 3,
-                                    boxShadow: '0 0 8px rgba(99, 102, 241, 0.3)'
-                                }} 
-                            />
-                        </Box>
-                        <Button 
-                            fullWidth 
-                            variant="contained" 
-                            size="small"
-                            onClick={() => navigate('/upgrade')}
-                            className="premium-button"
-                            sx={{ borderRadius: 2.5, py: 1, fontWeight: 800, fontSize: '0.75rem' }}
-                        >
-                            Upgrade to Pro
-                        </Button>
-                    </Box>
-                )}
-            </Box>
         </Box>
     );
 
@@ -195,15 +122,6 @@ const MainLayout = () => {
                         <MenuIcon />
                     </IconButton>
                     <Box sx={{ flexGrow: 1 }} />
-                    {user ? (
-                        <IconButton color="primary" onClick={handleLogout} title="Logout">
-                            <LogoutIcon />
-                        </IconButton>
-                    ) : (
-                        <IconButton color="primary" onClick={() => navigate('/login')} title="Login">
-                            <LockIcon />
-                        </IconButton>
-                    )}
                 </Toolbar>
             </AppBar>
 

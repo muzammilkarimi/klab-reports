@@ -3,43 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { 
     Box, Typography, Table, TableBody, TableCell, 
     TableContainer, TableHead, TableRow, Chip, IconButton,
-    TextField, InputAdornment, Button
+    TextField, InputAdornment
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import PrintIcon from '@mui/icons-material/Print';
 import { api } from '../api/api';
-import { useAuth } from '../context/AuthContext';
-
-interface Report {
-    id: number;
-    patient_name: string;
-    patient_age: number;
-    patient_gender: string;
-    test_names: string;
-    total_amount: number;
-    status: 'DRAFT' | 'FINAL';
-    created_at: string;
-}
+import type { Report } from '../types';
 
 const ReportHistory = () => {
     const navigate = useNavigate();
-    const { isPro } = useAuth();
     const [reports, setReports] = useState<Report[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
 
     const filteredReports = reports.filter(r => 
         r.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.test_names.toLowerCase().includes(searchTerm.toLowerCase()) ||
         String(r.id).includes(searchTerm)
     );
 
-    const displayedReports = isPro ? filteredReports : filteredReports.slice(0, 10);
-    const hasMore = !isPro && filteredReports.length > 10;
-
-    useEffect(() => {
-        loadReports();
-    }, []);
+    const displayedReports = filteredReports;
 
     const loadReports = async () => {
         try {
@@ -57,6 +39,15 @@ const ReportHistory = () => {
             setLoading(false); 
         }
     };
+
+    useEffect(() => {
+        let ignore = false;
+        const fetchReports = async () => {
+            await loadReports();
+        };
+        if (!ignore) fetchReports();
+        return () => { ignore = true; };
+    }, []);
 
     return (
         <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, md: 0 }, pb: 10 }}>
@@ -187,35 +178,6 @@ const ReportHistory = () => {
                     </Table>
                 </TableContainer>
             </Box>
-
-            {hasMore && (
-                <Box 
-                    sx={{ 
-                        mt: 4, p: 3, borderRadius: 5, 
-                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%)',
-                        border: '1px dashed rgba(99, 102, 241, 0.3)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2
-                    }}
-                >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                            <SearchIcon sx={{ color: '#4f46e5' }} />
-                        </Box>
-                        <Typography variant="body2" fontWeight="700" color="#475569">
-                            Showing last 10 reports. Upgrade to Pro to see all reports.
-                        </Typography>
-                    </Box>
-                    <Button 
-                        variant="contained" 
-                        size="small" 
-                        onClick={() => navigate('/upgrade')}
-                        className="premium-button"
-                        sx={{ px: 3, py: 1, borderRadius: 2.5, fontWeight: 800 }}
-                    >
-                        Upgrade to Pro
-                    </Button>
-                </Box>
-            )}
         </Box>
     );
 };

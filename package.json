@@ -2,6 +2,8 @@
   "name": "klab-reports",
   "private": true,
   "version": "1.0.3",
+  "description": "Professional Laboratory Reporting System",
+  "author": "kLab Reports",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -13,7 +15,7 @@
     "electron": "wait-on tcp:5173 && electron .",
     "electron:build": "vite build && electron-builder",
     "rebuild": "electron-builder install-app-deps",
-    "dist": "npm run build && electron-builder --win nsis -c.extraMetadata.main=electron/main.js -c.cscLink=null"
+    "dist": "npm run build && cross-env WIN_CSC_LINK='' CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable -c.extraMetadata.main=electron/main.js"
   },
   "build": {
     "appId": "com.klab.reports",
@@ -24,16 +26,22 @@
     "asar": true,
     "asarUnpack": [
       "backend",
-      "database"
+      "database",
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/bindings/**/*",
+      "node_modules/file-uri-to-path/**/*"
     ],
     "files": [
       "dist",
       "electron",
       "backend",
+      "node_modules",
       "package.json"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "forceCodeSigning": false,
+      "icon": "public/icon.png"
     },
     "nsis": {
       "oneClick": false,

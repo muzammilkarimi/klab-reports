@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Button, AppBar, Toolbar, Typography, IconButton, Paper, Container, Stack } from '@mui/material';
+import { Box, Button, AppBar, Toolbar, Typography, IconButton, Container, Stack } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PrintIcon from '@mui/icons-material/Print';
 import SaveIcon from '@mui/icons-material/Save';
@@ -133,28 +133,19 @@ const ViewReport = () => {
                 flexDirection: 'column',
                 alignItems: 'center', 
                 overflow: 'auto',
-                '@media print': { p: 0, bgcolor: 'white', overflow: 'visible' }
+                '@media print': { p: 0, bgcolor: 'transparent', overflow: 'visible', display: 'block', height: 'auto' }
             }}>
-                <Paper sx={{ 
-                    width: '210mm', 
-                    minHeight: '297mm',
-                    bgcolor: 'white',
-                    color: '#1e293b',
-                    borderRadius: 2,
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)', // Softer shadow for light mode
-                    overflow: 'hidden',
+                <Box sx={{
                     transform: { xs: 'scale(0.4)', sm: 'scale(0.6)', md: 'scale(0.8)', lg: 'scale(1)' },
                     transformOrigin: 'top center',
-                    mb: 10,
-                    '@media print': {
-                        transform: 'none',
-                        boxShadow: 'none',
-                        borderRadius: 0,
-                        margin: 0
-                    }
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    width: '100%',
+                    '@media print': { transform: 'none' }
                 }}>
                     <PrintReport />
-                </Paper>
+                </Box>
             </Box>
         </Box>
     );

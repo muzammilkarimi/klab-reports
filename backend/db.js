@@ -7,14 +7,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Get the user's data directory. In Electron, this is app.getPath('userData')
-const isPackaged = process.env.NODE_ENV === 'production' || !!process.env.ELECTRON_RUN_AS_NODE;
+const isProduction = process.env.NODE_ENV === 'production';
 const userDataPath = process.env.USER_DATA_PATH || 
     (process.platform === 'win32' ? process.env.APPDATA : path.join(process.env.HOME, '.config'));
 
-// In production, we store in %APPDATA%/kLab-Reports/database/klab.db
+// In production, we store in %APPDATA%/klab-reports/database/klab.db
 // In development, we use the local project database folder
-const dbDir = isPackaged 
-    ? path.join(userDataPath, 'kLab-Reports', 'database') 
+const dbDir = isProduction 
+    ? path.join(userDataPath, 'klab-reports', 'database') 
     : path.join(__dirname, '../database');
 
 const dbPath = path.join(dbDir, 'klab.db');
@@ -26,6 +26,9 @@ if (!fs.existsSync(dbDir)) {
 
 console.log('Using Database at:', dbPath);
 const db = new Database(dbPath, { verbose: console.log });
+
+// Enable foreign key support
+db.exec('PRAGMA foreign_keys = ON;');
 
 function initDb() {
     const schemaPath = path.join(__dirname, 'schema.sql');
@@ -47,6 +50,21 @@ function initDb() {
     try {
         db.exec(`ALTER TABLE reports ADD COLUMN bill_number TEXT;`);
         console.log('Added bill_number column');
+    } catch (e) { /* Column exists */ }
+
+    // Migrations: Add new fields to report_results table if they don't exist
+    const reportResultsCols = ['test_name', 'param_name', 'unit', 'min_range', 'max_range'];
+    for (const col of reportResultsCols) {
+        try {
+            const type = (col === 'min_range' || col === 'max_range') ? 'REAL' : 'TEXT';
+            db.exec(`ALTER TABLE report_results ADD COLUMN ${col} ${type};`);
+            console.log(`Added ${col} column to report_results`);
+        } catch (e) { /* Column exists */ }
+    }
+
+    try {
+        db.exec(`ALTER TABLE tests ADD COLUMN department TEXT;`);
+        console.log('Added department column to tests');
     } catch (e) { /* Column exists */ }
 
     // Ensure default admin user exists

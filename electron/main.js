@@ -18,7 +18,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
-    }
+    },
+    icon: path.join(__dirname, '../public/icon.png')
   });
   console.log('Preload Path:', path.join(__dirname, 'preload.cjs'));
 
@@ -120,49 +121,94 @@ app.whenReady().then(() => {
   const isDev = !app.isPackaged;
   const userDataPath = app.getPath('userData');
   const appDataDir = path.join(userDataPath, 'kLab-Reports');
+  const logFile = path.join(appDataDir, 'fatal_error.log');
   
   // Ensure the AppData directory exists before starting backend
   if (!fs.existsSync(appDataDir)) {
     fs.mkdirSync(appDataDir, { recursive: true });
   }
 
+  // Log startup info
+  try {
+    fs.appendFileSync(logFile, `\n=== kLab Reports Started at ${new Date().toISOString()} ===\n`);
+    fs.appendFileSync(logFile, `Electron: ${process.versions.electron}, Node: ${process.versions.node}\n`);
+    fs.appendFileSync(logFile, `execPath: ${process.execPath}\n`);
+    fs.appendFileSync(logFile, `resourcesPath: ${process.resourcesPath}\n`);
+    fs.appendFileSync(logFile, `isDev: ${isDev}\n`);
+  } catch(e) {}
+
   const backendPath = isDev 
     ? path.join(__dirname, '../backend/server.js')
     : path.join(process.resourcesPath, 'app.asar.unpacked/backend/server.js');
     
+  fs.appendFileSync(logFile, `backendPath: ${backendPath}\n`);
+  fs.appendFileSync(logFile, `backendPathExists: ${fs.existsSync(backendPath)}\n`);
+
   if (!fs.existsSync(backendPath)) {
-    console.error('CRITICAL: Backend file not found at:', backendPath);
-    // In production, we might want to show a dialog
-    if (!isDev) {
-      dialog.showErrorBox('Backend Error', `Backend server not found at: ${backendPath}`);
-    }
+    const msg = `Backend server not found at:\n${backendPath}\n\nPlease reinstall the application.`;
+    fs.appendFileSync(logFile, `CRITICAL: ${msg}\n`);
+    dialog.showErrorBox('Backend Not Found', msg);
+    return;
   }
 
   const BACKEND_PORT = 5000;
-  backendProcess = fork(backendPath, [], {
-    env: { 
-      ...process.env, 
-      PORT: BACKEND_PORT,
-      NODE_ENV: isDev ? 'development' : 'production',
-      USER_DATA_PATH: userDataPath
-    },
-    stdio: 'pipe' // Capture stdout/stderr
-  });
+  
+  try {
+    backendProcess = fork(backendPath, [], {
+      execPath: process.execPath, // Use Electron's built-in Node (no system Node.js required)
+      env: { 
+        ...process.env, 
+        ELECTRON_RUN_AS_NODE: '1', // Electron behaves as Node.js
+        PORT: String(BACKEND_PORT),
+        NODE_ENV: isDev ? 'development' : 'production',
+        USER_DATA_PATH: userDataPath
+      },
+      stdio: 'pipe'
+    });
 
-  backendProcess.stdout.on('data', (data) => {
-    console.log(`Backend Log: ${data}`);
-  });
+    fs.appendFileSync(logFile, `Backend forked. PID: ${backendProcess.pid}\n`);
 
-  backendProcess.stderr.on('data', (data) => {
-    console.error(`Backend Error: ${data}`);
-    // Log fatal backend errors to a file in userData
-    try {
-      fs.appendFileSync(path.join(appDataDir, 'fatal_error.log'), `[${new Date().toISOString()}] ${data}\n`);
-    } catch {}
-  });
+    backendProcess.stdout.on('data', (data) => {
+      const msg = data.toString();
+      console.log(`Backend Log: ${msg}`);
+      try { fs.appendFileSync(logFile, `[BACKEND] ${msg}`); } catch {}
+    });
+
+    backendProcess.stderr.on('data', (data) => {
+      const msg = data.toString();
+      console.error(`Backend Error: ${msg}`);
+      try { fs.appendFileSync(logFile, `[BACKEND ERR] ${msg}`); } catch {}
+    });
+
+    backendProcess.on('exit', (code, signal) => {
+      const msg = `Backend process exited with code ${code}, signal ${signal}`;
+      console.error(msg);
+      try { fs.appendFileSync(logFile, `${msg}\n`); } catch {}
+      
+      // Show an error box if the backend crashes unexpectedly on a non-dev build
+      if (!isDev && code !== 0 && code !== null) {
+        const logPath = logFile;
+        dialog.showErrorBox(
+          'Backend Error',
+          `The backend server stopped unexpectedly (code: ${code}).\n\nCheck the log file for details:\n${logPath}`
+        );
+      }
+    });
+
+    backendProcess.on('error', (err) => {
+      const msg = `Failed to start backend: ${err.message}`;
+      console.error(msg);
+      try { fs.appendFileSync(logFile, `${msg}\n${err.stack}\n`); } catch {}
+      dialog.showErrorBox('Backend Startup Failed', `${msg}\n\nCheck log:\n${logFile}`);
+    });
+
+  } catch (err) {
+    const msg = `Exception starting backend: ${err.message}`;
+    try { fs.appendFileSync(logFile, `${msg}\n${err.stack}\n`); } catch {}
+    dialog.showErrorBox('Backend Startup Error', `${msg}\n\nCheck log:\n${logFile}`);
+  }
 
   console.log('Backend started with path:', backendPath);
-  console.log('Backend PID:', backendProcess.pid);
 
   createWindow();
 

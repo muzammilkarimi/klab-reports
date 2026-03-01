@@ -5,17 +5,17 @@ import BusinessIcon from '@mui/icons-material/Business';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import LockIcon from '@mui/icons-material/Lock';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { api } from '../api/api';
-import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
+import type { User, Settings as SettingsType } from '../types';
+
+const currentUser = { id: 1, role: 'ADMIN' };
 
 const Settings = () => {
-    const { user: currentUser, isPro } = useAuth();
     const { showToast, showConfirm } = useNotification();
-    const [settings, setSettings] = useState({
+    const [settings, setSettings] = useState<SettingsType>({
         lab_name: 'kLab Reports',
         address_line1: '123 Health Street',
         address_line2: 'Medical District',
@@ -23,10 +23,10 @@ const Settings = () => {
         email: 'reports@klab.com',
         website: 'www.klab.com'
     });
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
     const [userDialogOpen, setUserDialogOpen] = useState(false);
-    const [editingUser, setEditingUser] = useState<any>(null);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
     const [userData, setUserData] = useState({ 
         username: '', 
         password: '', 
@@ -47,14 +47,14 @@ const Settings = () => {
             if (Object.keys(data).length > 0) {
                 setSettings(prev => ({ ...prev, ...data }));
             }
-        } catch (e) { console.error('Failed to load settings', e); }
+        } catch { console.error('Failed to load settings'); }
     };
 
     const loadUsers = async () => {
         try {
             const data = await api.getUsers();
             setUsers(data);
-        } catch (e) { console.error('Failed to load users', e); }
+        } catch { console.error('Failed to load users'); }
     };
 
     const handleSave = async () => {
@@ -62,9 +62,8 @@ const Settings = () => {
         try {
             await api.saveSettings(settings);
             showToast('Settings saved successfully!');
-        } catch (e) {
+        } catch {
             showToast('Failed to save settings.', 'error');
-            console.error(e);
         } finally {
             setLoading(false);
         }
@@ -82,8 +81,8 @@ const Settings = () => {
             setUserData({ username: '', password: '', full_name: '', role: 'TECHNICIAN' });
             loadUsers();
             showToast(editingUser ? 'User updated' : 'User created');
-        } catch (e: any) {
-            showToast(e.message, 'error');
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : 'Failed to perform user action', 'error');
         }
     };
 
@@ -100,12 +99,12 @@ const Settings = () => {
                     await api.deleteUser(id);
                     showToast('User removed successfully');
                     loadUsers();
-                } catch (e) { showToast('Failed to delete user', 'error'); }
+                } catch { showToast('Failed to delete user', 'error'); }
             }
         );
     };
 
-    const openEditUser = (u: any) => {
+    const openEditUser = (u: User) => {
         setEditingUser(u);
         setUserData({ 
             username: u.username, 
@@ -323,10 +322,9 @@ const Settings = () => {
                             <Typography variant="h4" fontWeight="800">Backups</Typography>
                             <Typography variant="body2" color="text.secondary" fontWeight="500">Save your data to a file for safety.</Typography>
                         </Box>
-                        {!isPro && <Chip icon={<LockIcon sx={{ fontSize: '1rem !important' }} />} label="PRO FEATURE" color="primary" sx={{ fontWeight: 800, borderRadius: 2 }} />}
                     </Box>
                     
-                    <Box className="glass-card" sx={{ p: 4, display: 'flex', gap: 4, bgcolor: !isPro ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.4)', opacity: !isPro ? 0.6 : 1, pointerEvents: !isPro ? 'none' : 'auto' }}>
+                    <Box className="glass-card" sx={{ p: 4, display: 'flex', gap: 4, bgcolor: 'rgba(255,255,255,0.4)', opacity: 1, pointerEvents: 'auto' }}>
                         <Button variant="outlined" startIcon={<CloudDownloadIcon />} sx={{ borderRadius: 3, fontWeight: 700 }}>Save Data to File</Button>
                         <Button variant="outlined" startIcon={<CloudUploadIcon />} sx={{ borderRadius: 3, fontWeight: 700 }}>Upload Data from File</Button>
                     </Box>
@@ -337,13 +335,12 @@ const Settings = () => {
                 <Box sx={{ mt: 8, mb: 10 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 3 }}>
                         <Typography variant="h5" fontWeight="800" sx={{ color: 'error.main' }}>Delete All Data</Typography>
-                        {!isPro && <Chip icon={<LockIcon sx={{ fontSize: '1rem !important' }} />} label="PRO FEATURE" color="error" variant="outlined" sx={{ fontWeight: 800, borderRadius: 2 }} />}
                     </Box>
                     <Box sx={{ 
                         p: 4, borderRadius: 6, border: '1px dashed', borderColor: 'error.light', 
                         bgcolor: 'rgba(244, 63, 94, 0.03)', display: 'flex', justifyContent: 'space-between', 
                         alignItems: 'center', flexWrap: 'wrap', gap: 3,
-                        opacity: !isPro ? 0.6 : 1, pointerEvents: !isPro ? 'none' : 'auto'
+                        opacity: 1, pointerEvents: 'auto'
                     }}>
                         <Box>
                             <Typography variant="h6" fontWeight="800">Clear All Information</Typography>
@@ -364,8 +361,8 @@ const Settings = () => {
                                             await api.resetDatabase();
                                             showToast('System database has been purged.');
                                             setTimeout(() => window.location.reload(), 2000);
-                                        } catch (e: any) {
-                                            showToast('Purge failed: ' + e.message, 'error');
+                                        } catch (e: unknown) {
+                                            showToast('Purge failed: ' + (e instanceof Error ? e.message : String(e)), 'error');
                                         }
                                     }
                                 );

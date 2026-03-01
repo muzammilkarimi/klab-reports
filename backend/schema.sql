@@ -49,9 +49,14 @@ CREATE TABLE IF NOT EXISTS report_results (
     result_value TEXT,
     status TEXT, -- LOW, NORMAL, HIGH
     remarks TEXT,
+    test_name TEXT,
+    param_name TEXT,
+    unit TEXT,
+    min_range REAL,
+    max_range REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(report_id) REFERENCES reports(id) ON DELETE CASCADE,
-    FOREIGN KEY(parameter_id) REFERENCES test_parameters(id)
+    FOREIGN KEY(parameter_id) REFERENCES test_parameters(id) ON DELETE CASCADE
 );
 
 -- Users Table

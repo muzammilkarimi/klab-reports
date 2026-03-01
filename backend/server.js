@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import { db, initDb } from './db.js';
 import { seedData } from './seed.js';
-import { seedReports } from './seed_reports.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,13 +10,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Ensure we have a writable log path
-const isPackaged = process.env.NODE_ENV === 'production' || !!process.env.ELECTRON_RUN_AS_NODE;
-const userDataPath = process.env.USER_DATA_PATH || 
-    (process.platform === 'win32' ? process.env.APPDATA : path.join(process.env.HOME, '.config'));
-const appDataDir = path.join(userDataPath, 'kLab-Reports');
+const isDev = process.env.NODE_ENV === 'development';
+const appDataDir = (isDev) 
+    ? path.join(__dirname, '..') // Project root
+    : path.join(userDataPath, 'klab-reports');
+
 if (!fs.existsSync(appDataDir)) fs.mkdirSync(appDataDir, { recursive: true });
 
-const logFile = path.join(appDataDir, 'backend.log');
+const logFile = path.join(appDataDir, isDev ? 'debug_backend.log' : 'backend.log');
 
 try {
     const startMsg = `Backend starting at ${new Date().toISOString()}\n`;
@@ -69,12 +69,17 @@ app.use(express.json());
 // Initialize DB on start
 initDb();
 
-// Auto-seed if database is empty
+// Auto-seed medical data
+console.log('Seeding/Updating medical tests...');
+try {
+    seedData(db);
+} catch (e) {
+    console.error('Initial seeding failed:', e.message);
+}
+// Check if we should seed sample reports (only if patients is empty)
 const patientCount = db.prepare('SELECT COUNT(*) as count FROM patients').get().count;
 if (patientCount === 0) {
-    console.log('Database empty, performing auto-seed...');
-    seedData(db);
-    seedReports();
+    console.log('No patients found; database appears new.');
 }
 
 // API Routes
@@ -158,62 +163,7 @@ app.delete('/api/users/:id', (req, res) => {
     }
 });
 
-// -- Licensing & Usage --
-app.get('/api/license-status', (req, res) => {
-    try {
-        let tier = 'FREE';
-        try {
-            const tierRow = db.prepare('SELECT config_value FROM app_config WHERE config_key = ?').get('tier');
-            if (tierRow) tier = tierRow.config_value;
-        } catch (e) {
-            console.error('app_config query failed:', e.message);
-        }
-        
-        // Count reports created in the current month
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const firstDayOfMonth = `${year}-${month}-01 00:00:00`;
-        
-        let count = 0;
-        try {
-            const usage = db.prepare("SELECT COUNT(*) as count FROM reports WHERE status = 'FINAL' AND created_at >= ?").get(firstDayOfMonth);
-            count = usage?.count || 0;
-        } catch (e) {
-            console.error('Usage count query failed:', e.message);
-        }
-        
-        res.json({
-            tier,
-            monthlyUsage: count,
-            limit: 30,
-            isPro: tier === 'PRO'
-        });
-    } catch (error) {
-        console.error('License Status Global Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/activate-license', (req, res) => {
-    try {
-        const { key } = req.body;
-        
-        // Simple verification for MVP: In a real app, this would be more complex
-        // We'll use a set of valid keys or a secret pattern
-        const VALID_KEYS = ['KLAB-PRO-2026', 'KLAB-ADMIN-999'];
-        
-        if (VALID_KEYS.includes(key)) {
-            db.prepare('UPDATE app_config SET config_value = ? WHERE config_key = ?').run('PRO', 'tier');
-            db.prepare('INSERT OR REPLACE INTO app_config (config_key, config_value) VALUES (?, ?)').run('license_key', key);
-            res.json({ success: true, message: 'Pro License Activated!' });
-        } else {
-            res.status(400).json({ error: 'Invalid license key' });
-        }
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// --- Licensing & Usage (Removed) ---
 
 // -- Database Maintenance --
 app.post('/api/reset-database', (req, res) => {
@@ -236,7 +186,6 @@ app.post('/api/reset-database', (req, res) => {
         // Re-initialize default admin, settings, and medical data
         initDb();
         seedData(db);
-        seedReports();
         
         const counts = {
             patients: db.prepare('SELECT COUNT(*) as count FROM patients').get().count,
@@ -250,6 +199,17 @@ app.post('/api/reset-database', (req, res) => {
         });
     } catch (error) {
         console.error('Reset Database Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// -- Development / Setup Utility --
+app.post('/api/dev/reseed', (req, res) => {
+    try {
+        console.log('Forced re-seed triggered...');
+        seedData(db);
+        res.json({ success: true, message: 'Database re-seeded with latest test list.' });
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
@@ -375,8 +335,13 @@ app.put('/api/parameters/:id', (req, res) => {
 app.delete('/api/parameters/:id', (req, res) => {
     try {
         const { id } = req.params;
-        const stmt = db.prepare('DELETE FROM test_parameters WHERE id = ?');
-        stmt.run(id);
+        
+        const deleteParam = db.prepare('DELETE FROM test_parameters WHERE id = ?');
+        
+        db.transaction(() => {
+            deleteParam.run(id);
+        })();
+        
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -442,6 +407,22 @@ app.get('/api/next-bill-number', (req, res) => {
     }
 });
 
+app.get('/api/referring-doctors', (req, res) => {
+    try {
+        const rows = db.prepare(`
+            SELECT DISTINCT referring_doctor 
+            FROM reports 
+            WHERE referring_doctor IS NOT NULL 
+            AND referring_doctor != '' 
+            ORDER BY referring_doctor ASC
+        `).all();
+        const doctors = rows.map(r => r.referring_doctor);
+        res.json(doctors);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // -- Reports --
 app.get('/api/reports', (req, res) => {
     try {
@@ -467,10 +448,10 @@ app.get('/api/reports', (req, res) => {
              
              // Let's get distinct test names for this report
              const tests = db.prepare(`
-                SELECT DISTINCT t.test_name 
+                SELECT DISTINCT COALESCE(rr.test_name, t.test_name) as test_name 
                 FROM report_results rr
-                JOIN test_parameters tp ON rr.parameter_id = tp.id
-                JOIN tests t ON tp.test_id = t.id
+                LEFT JOIN test_parameters tp ON rr.parameter_id = tp.id
+                LEFT JOIN tests t ON tp.test_id = t.id
                 WHERE rr.report_id = ?
              `).all(r.id);
              
@@ -504,17 +485,18 @@ app.get('/api/reports/:id', (req, res) => {
         const results = db.prepare(`
             SELECT 
                 rr.*, 
-                tp.param_name,
-                tp.unit,
-                tp.min_range,
-                tp.max_range,
+                COALESCE(rr.param_name, tp.param_name) as param_name,
+                COALESCE(rr.unit, tp.unit) as unit,
+                COALESCE(rr.min_range, tp.min_range) as min_range,
+                COALESCE(rr.max_range, tp.max_range) as max_range,
+                COALESCE(tp.gender_specific, 0) as gender_specific,
                 tp.test_id,
-                t.test_name
+                COALESCE(rr.test_name, t.test_name) as test_name
             FROM report_results rr
-            JOIN test_parameters tp ON rr.parameter_id = tp.id
-            JOIN tests t ON tp.test_id = t.id
+            LEFT JOIN test_parameters tp ON rr.parameter_id = tp.id
+            LEFT JOIN tests t ON tp.test_id = t.id
             WHERE rr.report_id = ?
-            ORDER BY t.test_name, tp.param_name
+            ORDER BY COALESCE(rr.test_name, t.test_name), COALESCE(rr.param_name, tp.param_name)
         `).all(id);
 
         // Attach results to report
@@ -540,34 +522,6 @@ app.put('/api/reports/:id', (req, res) => {
             sample_collection_date,
             bill_number
         } = req.body;
-
-        // --- Tier Enforcement Check ---
-        if (status === 'FINAL') {
-            const tierRow = db.prepare('SELECT config_value FROM app_config WHERE config_key = ?').get('tier');
-            const tier = tierRow?.config_value || 'FREE';
-            
-            if (tier === 'FREE') {
-                // Check if this report is ALREADY final (if so, allow update)
-                const existing = db.prepare('SELECT status FROM reports WHERE id = ?').get(id);
-                if (existing?.status !== 'FINAL') {
-                    const now = new Date();
-                    const year = now.getFullYear();
-                    const month = String(now.getMonth() + 1).padStart(2, '0');
-                    const firstDayOfMonth = `${year}-${month}-01 00:00:00`;
-                    
-                    const usage = db.prepare("SELECT COUNT(*) as count FROM reports WHERE status = 'FINAL' AND created_at >= ?").get(firstDayOfMonth);
-                    const count = usage?.count || 0;
-                    
-                    if (count >= 30) {
-                        return res.status(403).json({ 
-                            error: 'Monthly limit reached (30 reports/month). Please upgrade to Pro for unlimited reporting.',
-                            limitReached: true
-                        });
-                    }
-                }
-            }
-        }
-        // ------------------------------
 
         db.transaction(() => {
             // 1. Update report header
@@ -596,13 +550,32 @@ app.put('/api/reports/:id', (req, res) => {
 
             // 3. Insert new results
             const insertResult = db.prepare(`
-                INSERT INTO report_results (report_id, parameter_id, result_value, status, remarks)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO report_results (report_id, parameter_id, result_value, status, remarks, test_name, param_name, unit, min_range, max_range)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+
+            const getParamDetails = db.prepare(`
+                SELECT tp.param_name, tp.unit, tp.min_range, tp.max_range, t.test_name
+                FROM test_parameters tp
+                LEFT JOIN tests t ON tp.test_id = t.id
+                WHERE tp.id = ?
             `);
 
             if (Array.isArray(results)) {
                 results.forEach(r => {
-                    insertResult.run(id, r.parameter_id, r.result_value, r.status, r.remarks || '');
+                    const paramDetails = getParamDetails.get(r.parameter_id) || {};
+                    insertResult.run(
+                        id, 
+                        r.parameter_id, 
+                        r.result_value, 
+                        r.status, 
+                        r.remarks || '',
+                        paramDetails.test_name || null,
+                        paramDetails.param_name || null,
+                        paramDetails.unit || null,
+                        paramDetails.min_range || null,
+                        paramDetails.max_range || null
+                    );
                 });
             }
         })();
@@ -628,30 +601,6 @@ app.post('/api/reports', (req, res) => {
             bill_number
         } = req.body;
 
-        // --- Tier Enforcement Check ---
-        if (status === 'FINAL') {
-            const tierRow = db.prepare('SELECT config_value FROM app_config WHERE config_key = ?').get('tier');
-            const tier = tierRow?.config_value || 'FREE';
-            
-            if (tier === 'FREE') {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const firstDayOfMonth = `${year}-${month}-01 00:00:00`;
-                
-                const usage = db.prepare("SELECT COUNT(*) as count FROM reports WHERE status = 'FINAL' AND created_at >= ?").get(firstDayOfMonth);
-                const count = usage?.count || 0;
-                
-                if (count >= 30) {
-                    return res.status(403).json({ 
-                        error: 'Monthly limit reached (30 reports/month). Please upgrade to Pro for unlimited reporting.',
-                        limitReached: true
-                    });
-                }
-            }
-        }
-        // ------------------------------
-
         console.log('Received Report Payload:', JSON.stringify(req.body, null, 2));
 
         const createReport = db.transaction(() => {
@@ -676,13 +625,32 @@ app.post('/api/reports', (req, res) => {
             const reportId = info.lastInsertRowid;
 
             const insertResult = db.prepare(`
-                INSERT INTO report_results (report_id, parameter_id, result_value, status, remarks)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO report_results (report_id, parameter_id, result_value, status, remarks, test_name, param_name, unit, min_range, max_range)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+
+            const getParamDetails = db.prepare(`
+                SELECT tp.param_name, tp.unit, tp.min_range, tp.max_range, t.test_name
+                FROM test_parameters tp
+                LEFT JOIN tests t ON tp.test_id = t.id
+                WHERE tp.id = ?
             `);
 
             if (Array.isArray(results)) {
                 results.forEach(r => {
-                    insertResult.run(reportId, r.parameter_id, r.result_value, r.status, r.remarks || '');
+                    const paramDetails = getParamDetails.get(r.parameter_id) || {};
+                    insertResult.run(
+                        reportId, 
+                        r.parameter_id, 
+                        r.result_value, 
+                        r.status, 
+                        r.remarks || '',
+                        paramDetails.test_name || null,
+                        paramDetails.param_name || null,
+                        paramDetails.unit || null,
+                        paramDetails.min_range || null,
+                        paramDetails.max_range || null
+                    );
                 });
             }
             

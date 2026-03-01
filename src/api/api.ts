@@ -1,13 +1,18 @@
+import type { 
+    Patient, Test, TestParameter, Report, 
+    Settings, User, LicenseStatus 
+} from '../types';
+
 const API_BASE = 'http://127.0.0.1:5000/api';
 
 export const api = {
-    getPatients: async () => {
+    getPatients: async (): Promise<Patient[]> => {
         const res = await fetch(`${API_BASE}/patients`);
         if (!res.ok) throw new Error('Failed to fetch patients');
         return res.json();
     },
 
-    createPatient: async (patient: any) => {
+    createPatient: async (patient: Patient) => {
         const res = await fetch(`${API_BASE}/patients`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -17,19 +22,19 @@ export const api = {
         return res.json();
     },
 
-    getTests: async () => {
+    getTests: async (): Promise<Test[]> => {
         const res = await fetch(`${API_BASE}/tests`);
         if (!res.ok) throw new Error('Failed to fetch tests');
         return res.json();
     },
 
-    getTestParameters: async (testId: number) => {
+    getTestParameters: async (testId: number): Promise<TestParameter[]> => {
         const res = await fetch(`${API_BASE}/tests/${testId}/parameters`);
         if (!res.ok) throw new Error('Failed to fetch parameters');
         return res.json();
     },
 
-    saveReport: async (reportData: any) => {
+    saveReport: async (reportData: Partial<Report>) => {
         const res = await fetch(`${API_BASE}/reports`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -39,7 +44,7 @@ export const api = {
         return res.json();
     },
 
-    updateReport: async (id: number, reportData: any) => {
+    updateReport: async (id: number, reportData: Partial<Report>) => {
         const res = await fetch(`${API_BASE}/reports/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -49,14 +54,14 @@ export const api = {
         return res.json();
     },
 
-    getReport: async (id: number) => {
+    getReport: async (id: number): Promise<Report> => {
         const res = await fetch(`${API_BASE}/reports/${id}`);
         if (!res.ok) throw new Error('Failed to fetch report');
         return res.json();
     },
 
     // Test Management
-    createTest: async (testData: any) => {
+    createTest: async (testData: Partial<Test>) => {
         const res = await fetch(`${API_BASE}/tests`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -66,7 +71,7 @@ export const api = {
         return res.json();
     },
 
-    updateTest: async (id: number, testData: any) => {
+    updateTest: async (id: number, testData: Partial<Test>) => {
         const res = await fetch(`${API_BASE}/tests/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -82,7 +87,7 @@ export const api = {
         return res.json();
     },
 
-    saveParameter: async (paramData: any) => {
+    saveParameter: async (paramData: Partial<TestParameter>) => {
         const url = paramData.id ? `${API_BASE}/parameters/${paramData.id}` : `${API_BASE}/parameters`;
         const method = paramData.id ? 'PUT' : 'POST';
         
@@ -102,13 +107,13 @@ export const api = {
     },
 
     // Settings
-    getSettings: async () => {
+    getSettings: async (): Promise<Settings> => {
         const res = await fetch(`${API_BASE}/settings`);
         if (!res.ok) throw new Error('Failed to fetch settings');
         return res.json();
     },
 
-    saveSettings: async (settings: any) => {
+    saveSettings: async (settings: Settings) => {
         const res = await fetch(`${API_BASE}/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -119,7 +124,7 @@ export const api = {
     },
 
     // Reports List
-    getReports: async () => {
+    getReports: async (): Promise<Report[]> => {
         const res = await fetch(`${API_BASE}/reports`);
         if (!res.ok) throw new Error('Failed to fetch reports');
         return res.json();
@@ -137,8 +142,14 @@ export const api = {
         return res.json();
     },
 
+    getReferringDoctors: async (): Promise<string[]> => {
+        const res = await fetch(`${API_BASE}/referring-doctors`);
+        if (!res.ok) throw new Error('Failed to fetch referring doctors');
+        return res.json();
+    },
+
     // -- Auth & Users --
-    login: async (credentials: any) => {
+    login: async (credentials: Record<string, string>): Promise<{ user: User; success: boolean }> => {
         const res = await fetch(`${API_BASE}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -151,13 +162,13 @@ export const api = {
         return res.json();
     },
 
-    getUsers: async () => {
+    getUsers: async (): Promise<User[]> => {
         const res = await fetch(`${API_BASE}/users`);
         if (!res.ok) throw new Error('Failed to fetch users');
         return res.json();
     },
 
-    createUser: async (userData: any) => {
+    createUser: async (userData: Partial<User>) => {
         const res = await fetch(`${API_BASE}/users`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -170,7 +181,7 @@ export const api = {
         return res.json();
     },
 
-    updateUser: async (id: number, userData: any) => {
+    updateUser: async (id: number, userData: Partial<User>) => {
         const res = await fetch(`${API_BASE}/users/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -187,7 +198,7 @@ export const api = {
     },
 
     // -- Licensing --
-    getLicenseStatus: async () => {
+    getLicenseStatus: async (): Promise<LicenseStatus> => {
         const res = await fetch(`${API_BASE}/license-status`);
         if (!res.ok) throw new Error('Failed to fetch license status');
         return res.json();

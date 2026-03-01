@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d47a1"/>
+      <stop offset="100%" style="stop-color:#00838f"/>
+    </linearGradient>
+    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#b2ebf2"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="100" ry="100" fill="url(#bgGrad)"/>
+
+  <!-- Subtle inner glow ring -->
+  <rect width="512" height="512" rx="100" ry="100" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="20"/>
+
+  <!-- DNA / Helix Left strand -->
+  <g filter="url(#glow)" opacity="0.9">
+    <!-- Left helix strand -->
+    <path d="M 180 110 Q 210 145 180 180 Q 150 215 180 250 Q 210 285 180 320 Q 150 355 180 390" 
+          stroke="url(#iconGrad)" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <!-- Right helix strand -->
+    <path d="M 240 110 Q 210 145 240 180 Q 270 215 240 250 Q 210 285 240 320 Q 270 355 240 390" 
+          stroke="#00e5ff" stroke-width="10" fill="none" stroke-linecap="round" opacity="0.85"/>
+    <!-- Cross-rungs of DNA -->
+    <line x1="180" y1="148" x2="240" y2="148" stroke="rgba(255,255,255,0.7)" stroke-width="6" stroke-linecap="round"/>
+    <line x1="180" y1="215" x2="240" y2="215" stroke="rgba(255,255,255,0.7)" stroke-width="6" stroke-linecap="round"/>
+    <line x1="180" y1="283" x2="240" y2="283" stroke="rgba(255,255,255,0.7)" stroke-width="6" stroke-linecap="round"/>
+    <line x1="180" y1="350" x2="240" y2="350" stroke="rgba(255,255,255,0.7)" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <!-- Large stylized "k" on the right side -->
+  <g filter="url(#softGlow)">
+    <text x="285" y="390" 
+          font-family="'Arial Black', 'Helvetica Neue', sans-serif" 
+          font-size="310" 
+          font-weight="900"
+          fill="url(#iconGrad)"
+          opacity="0.95"
+          letter-spacing="-10">k</text>
+  </g>
+
+  <!-- Accent dot / circle (lab theme) -->
+  <circle cx="370" cy="135" r="28" fill="#00e5ff" opacity="0.8" filter="url(#glow)"/>
+  <circle cx="370" cy="135" r="16" fill="white" opacity="0.95"/>
+
+  <!-- Bottom Label Band -->
+  <rect x="0" y="430" width="512" height="82" rx="0" ry="0" fill="rgba(0,0,0,0.25)"/>
+  <rect x="0" y="430" width="512" height="82" rx="0" ry="0" fill="none"/>
+  <!-- Rounded bottom corners only -->
+  <rect x="0" y="430" width="512" height="82" rx="0" ry="0" fill="rgba(0,0,80,0.2)"/>
+  
+  <text x="256" y="488" 
+        font-family="'Arial', 'Helvetica Neue', sans-serif" 
+        font-size="42" 
+        font-weight="700"
+        fill="white"
+        text-anchor="middle"
+        opacity="0.95"
+        letter-spacing="4">REPORTS</text>
+</svg>
